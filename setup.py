@@ -20,11 +20,12 @@ setup(
     install_requires=[
         "beautifulsoup4>=4.5.3",
         "websockets>=3.3",
-        "requests>=2.13"
+        "requests>=2.13",
+        "Pillow>=4.0.0"
     ],
     license="MIT",
     classifiers=[
-        "Development Status :: 2 - Pre-Alpha",
+        "Development Status :: 3 - Alpha",
         "Environment :: No Input/Output (Daemon)",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
