@@ -18,7 +18,9 @@ setup(
     description="Recording reddit's /r/place experiment, one pixel at a time.",
     long_description=read("README.rst"),
     install_requires=[
-        "praw>=4.4.0"
+        "beautifulsoup4>=4.5.3",
+        "websockets>=3.3",
+        "requests>=2.13"
     ],
     license="MIT",
     classifiers=[

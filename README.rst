@@ -3,7 +3,7 @@ saving-place
 
 Documents `reddit's`_ `/r/place`_ experiment for April Fool's 2017 by maintaining a WebSocket connection and recording each change, one pixel at a time.
 
-To accomplish this, the script uses legitimate OAuth2 credentials to load the `/r/place webview`_ and then connects via WebSocket to reddit's undocumented /r/place API.
+To accomplish this, the script loads the `/r/place webview`_ as a logged out bot user (i.e. with a descriptive user-agent) and then connects via WebSocket to reddit's undocumented /r/place API.
 
 Access is purely read-only; this is not intended to be used as a bot to circumvent any imposed limitations.
 
