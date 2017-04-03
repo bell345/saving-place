@@ -8,3 +8,5 @@ setuptools-*
 _*.sh
 *.bin
 *.png
+archive/
+*.log

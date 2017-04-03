@@ -7,16 +7,10 @@ import argparse
 from time import sleep
 from pathlib import Path
 
-from .scrape import get_websocket_url, get_initial_bitmap
 from .websocket import monitor_place
 from .sync import sync_place
 from .serial import save_image
-from .log import status_log
 from .version import APP_NAME, APP_VERSION, USER_AGENT
-
-def abort(msg):
-    print(msg, file=sys.stderr)
-    sys.exit(1)
 
 def main():
     parser = argparse.ArgumentParser(prog=APP_NAME,
@@ -34,17 +28,8 @@ def main():
 
     args = parser.parse_args()
 
-    status_log("Retrieving initial bitmap...")
-    img = get_initial_bitmap()
-    status_log("Saving to file...")
-    save_image(img, args.output)
-
-    url = get_websocket_url()
-    if not url:
-        return abort("Unable to get WebSocket URL.")
-
     loop = asyncio.get_event_loop()
-    task1 = monitor_place(url, args.output)
+    task1 = monitor_place(args.output)
     task2 = sync_place(args.output, args.interval)
     loop.run_until_complete(asyncio.gather(task1, task2))
 

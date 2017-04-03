@@ -14,7 +14,6 @@ sync_lock = asyncio.Lock()
 
 async def sync_place(directory, interval=600):
     while True:
-        await asyncio.sleep(interval)
         with (await sync_lock):
             status_log("Retrieving bitmap...")
             try:
@@ -27,4 +26,6 @@ async def sync_place(directory, interval=600):
             filename = Path(directory) / "place-{}.png".format(timestamp)
             status_log("Saving {}...".format(filename.stem))
             img.save(str(filename.absolute()))
+
+        await asyncio.sleep(interval)
 

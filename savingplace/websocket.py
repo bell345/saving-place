@@ -12,13 +12,14 @@ import websockets.exceptions as wsexcept
 from .version import USER_AGENT
 from .log import status_log
 from .sync import sync_lock
+from .scrape import get_websocket_url
 from .serial import decode_ws_msg, write_increment, open_change_output
 
 WS_ORIGIN = "https://www.reddit.com"
 
 async def worker(fp, url):
     headers = (("User-Agent", USER_AGENT),)
-    status_log("Connecting to WebSocket...")
+    status_log("Connecting to WebSocket: '{}'".format(url))
     async with websockets.connect(url, origin=WS_ORIGIN,
                                   extra_headers=headers) as ws:
         status_log("Connected.")
@@ -38,17 +39,20 @@ async def worker(fp, url):
                     continue
                 write_increment(fp, ts, x, y, colour, author)
 
-async def monitor_place(url, directory):
+async def monitor_place(directory):
+    retry_time = 5
+    last_retry = time.time()
     while True:
-        retry_time = 5
-        last_retry = time.time()
         try:
-            fp = open_change_output(directory)
-            await worker(fp, url)
+            url = get_websocket_url()
+            if not url:
+                status_log("URI could not be obtained.")
+            else:
+                fp = open_change_output(directory)
+                await worker(fp, url)
 
         except wsexcept.InvalidURI:
             status_log("'{}' is not a valid WebSocket URI.".format(url))
-            break
 
         except (wsexcept.InvalidHandshake,
                 wsexcept.ConnectionClosed,
@@ -59,19 +63,21 @@ async def monitor_place(url, directory):
             else:
                 status_log("Cannot connect: {}".format(str(e)))
 
-            if (retry_time > 5 and
-                (datetime.now().timestamp() - last_retry) > retry_time):
-                retry_time = 5
-
-            if retry_time > 600:
-                break
-
-            status_log("Retrying in {}s...".format(retry_time))
-            await asyncio.sleep(retry_time)
-
-            retry_time *= 2
-            last_retry = datetime.now().timestamp()
-
         finally:
             fp.close()
+            status_log("WebSocket closed.")
+
+        if (retry_time > 5 and
+            (datetime.now().timestamp() - last_retry) > retry_time):
+            retry_time = 5
+
+        if retry_time > 600:
+            status_log("Retry time greater than 600s.")
+            break
+
+        status_log("Retrying in {}s...".format(retry_time))
+        await asyncio.sleep(retry_time)
+
+        retry_time *= 2
+        last_retry = datetime.now().timestamp()
 
