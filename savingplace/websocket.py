@@ -1,47 +1,77 @@
 #!/usr/bin/env python3
 
 import json
+import time
+import socket
+import asyncio
 from datetime import datetime
 
 import websockets
+import websockets.exceptions as wsexcept
 
 from .version import USER_AGENT
+from .log import status_log
+from .sync import sync_lock
+from .serial import decode_ws_msg, write_increment, open_change_output
 
 WS_ORIGIN = "https://www.reddit.com"
 
-async def monitor_place(fp, url):
+async def worker(fp, url):
     headers = (("User-Agent", USER_AGENT),)
-    print("Connecting to WebSocket...")
+    status_log("Connecting to WebSocket...")
     async with websockets.connect(url, origin=WS_ORIGIN,
                                   extra_headers=headers) as ws:
-        print("Connected.")
+        status_log("Connected.")
+        msg_buffer = []
         while True:
             msg = await ws.recv()
+            msg_buffer.append((time.time(), msg))
 
-            try:
-                obj = json.loads(msg)
-                if obj["type"] != "place":
+            if sync_lock.locked():
+                continue
+
+            while len(msg_buffer) > 0:
+                ts, msg = msg_buffer.pop()
+                x, y, colour, author = decode_ws_msg(msg)
+                if x is None:
+                    status_log("Can't parse message: {}".format(msg))
                     continue
+                write_increment(fp, ts, x, y, colour, author)
 
-                payload = obj["payload"]
+async def monitor_place(url, directory):
+    while True:
+        retry_time = 5
+        last_retry = time.time()
+        try:
+            fp = open_change_output(directory)
+            await worker(fp, url)
 
-            except (json.JSONDecodeError, KeyError, ValueError) as e:
-                print("Failed to retrieve payload: {!s}".format(e))
-                continue
+        except wsexcept.InvalidURI:
+            status_log("'{}' is not a valid WebSocket URI.".format(url))
+            break
 
-            try:
-                x, y, colour, author = (
-                    payload["x"], payload["y"],
-                    payload["color"], payload["author"])
+        except (wsexcept.InvalidHandshake,
+                wsexcept.ConnectionClosed,
+                socket.error) as e:
+            if isinstance(e, wsexcept.ConnectionClosed):
+                status_log("Connection closed ({}): {}".format(
+                    e.code, e.reason))
+            else:
+                status_log("Cannot connect: {}".format(str(e)))
 
-            except KeyError as e:
-                print("Failed to retrieve properties: {!s}".format(e))
+            if (retry_time > 5 and
+                (datetime.now().timestamp() - last_retry) > retry_time):
+                retry_time = 5
 
-            if not (x or y or colour or author):
-                print("Properties invalid")
-                continue
+            if retry_time > 600:
+                break
 
-            fp.write(",".join(map(str, [
-                datetime.now().timestamp(),
-                x, y, colour, author])) + "\n")
+            status_log("Retrying in {}s...".format(retry_time))
+            await asyncio.sleep(retry_time)
+
+            retry_time *= 2
+            last_retry = datetime.now().timestamp()
+
+        finally:
+            fp.close()
 

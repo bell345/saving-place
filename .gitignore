@@ -6,3 +6,5 @@ dist/
 setuptools-*
 
 _*.sh
+*.bin
+*.png
