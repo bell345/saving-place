@@ -90,7 +90,7 @@ def write_increment(fp, timestamp, x, y, colour, author):
         timestamp_delta = 0
     else:
         timestamp_delta = int((timestamp - last_timestamp) * 1e6)
-        if timestamp_delta >= 2**16:
+        if timestamp_delta >= 2**16 or timestamp_delta < 0:
             write_keyframe(fp, timestamp)
             timestamp_delta = 0
 

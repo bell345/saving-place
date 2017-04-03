@@ -17,30 +17,38 @@ from .serial import decode_ws_msg, write_increment, open_change_output
 
 WS_ORIGIN = "https://www.reddit.com"
 
-async def worker(fp, url):
+async def worker(syncmon, fp, url):
     headers = (("User-Agent", USER_AGENT),)
-    status_log("Connecting to WebSocket: '{}'".format(url))
-    async with websockets.connect(url, origin=WS_ORIGIN,
-                                  extra_headers=headers) as ws:
-        status_log("Connected.")
-        msg_buffer = []
-        while True:
-            msg = await ws.recv()
-            msg_buffer.append((time.time(), msg))
+    synchndl = await syncmon.register()
+    try:
+        await syncmon.log(synchndl,
+            "Connecting to WebSocket: '{}'".format(url))
 
-            if sync_lock.locked():
-                continue
+        async with websockets.connect(url, origin=WS_ORIGIN,
+                                      extra_headers=headers) as ws:
+            await syncmon.log(synchndl, "Connected.")
 
-            while len(msg_buffer) > 0:
-                ts, msg = msg_buffer.pop()
+            while True:
+                msg = await ws.recv()
                 x, y, colour, author = decode_ws_msg(msg)
                 if x is None:
-                    status_log("Can't parse message: {}".format(msg))
+                    await syncmon.log(synchndl, 
+                        "Can't parse message: {}".format(msg))
                     continue
-                write_increment(fp, ts, x, y, colour, author)
 
-async def monitor_place(directory):
-    retry_time = 5
+                await syncmon.put((x, y, colour, author),
+                                  time.time())
+
+                if sync_lock.locked():
+                    continue
+
+                for ts, msg in (await syncmon.get()):
+                    write_increment(fp, ts, *msg)
+    finally:
+        await syncmon.deregister(synchndl)
+
+async def monitor_place(syncmon, directory):
+    retry_time = 0.5
     last_retry = time.time()
     while True:
         try:
@@ -49,7 +57,7 @@ async def monitor_place(directory):
                 status_log("URI could not be obtained.")
             else:
                 fp = open_change_output(directory)
-                await worker(fp, url)
+                await worker(syncmon, fp, url)
 
         except wsexcept.InvalidURI:
             status_log("'{}' is not a valid WebSocket URI.".format(url))
@@ -69,7 +77,7 @@ async def monitor_place(directory):
 
         if (retry_time > 5 and
             (datetime.now().timestamp() - last_retry) > retry_time):
-            retry_time = 5
+            retry_time = 0.5
 
         if retry_time > 600:
             status_log("Retry time greater than 600s.")

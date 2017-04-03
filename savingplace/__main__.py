@@ -8,7 +8,7 @@ from time import sleep
 from pathlib import Path
 
 from .websocket import monitor_place
-from .sync import sync_place
+from .sync import sync_place, SyncMonitor
 from .serial import save_image
 from .version import APP_NAME, APP_VERSION, USER_AGENT
 
@@ -28,10 +28,12 @@ def main():
 
     args = parser.parse_args()
 
+    syncmon = SyncMonitor()
     loop = asyncio.get_event_loop()
-    task1 = monitor_place(args.output)
-    task2 = sync_place(args.output, args.interval)
-    loop.run_until_complete(asyncio.gather(task1, task2))
+    mon_task1 = monitor_place(syncmon, args.output)
+    mon_task2 = monitor_place(syncmon, args.output)
+    sync_task = sync_place(args.output, args.interval)
+    loop.run_until_complete(asyncio.gather(mon_task1, mon_task2, sync_task))
 
 if __name__ == "__main__":
     main()
