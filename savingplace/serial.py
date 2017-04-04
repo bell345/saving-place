@@ -8,13 +8,9 @@ from pathlib import Path
 
 from .log import status_log
 
-def save_image(img, directory):
-    d = Path(directory)
-    d /= "place-{}.png".format(int(time.time()))
-    img.save(str(d.absolute()))
-
 def open_change_output(directory):
     d = Path(directory)
+    d.mkdir(parents=True, exist_ok=True)
     d /= "changes-{}.bin".format(int(time.time()))
     return open(str(d.absolute()), "ab")
 

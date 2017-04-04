@@ -7,10 +7,10 @@ import argparse
 from time import sleep
 from pathlib import Path
 
-from .websocket import monitor_place
-from .sync import sync_place, SyncMonitor
-from .serial import save_image
-from .version import APP_NAME, APP_VERSION, USER_AGENT
+from .websocket import task_monitor
+from .supervisor import Supervisor
+from .bitmap import task_bitmap
+from .version import APP_NAME, APP_VERSION
 
 def main():
     parser = argparse.ArgumentParser(prog=APP_NAME,
@@ -28,12 +28,13 @@ def main():
 
     args = parser.parse_args()
 
-    syncmon = SyncMonitor()
     loop = asyncio.get_event_loop()
-    mon_task1 = monitor_place(syncmon, args.output)
-    mon_task2 = monitor_place(syncmon, args.output)
-    sync_task = sync_place(args.output, args.interval)
-    loop.run_until_complete(asyncio.gather(mon_task1, mon_task2, sync_task))
+    supervisor = Supervisor()
+    task0 = supervisor.task()
+    task1 = task_monitor(supervisor, args.output)
+    task2 = task_monitor(supervisor, args.output)
+    task3 = task_bitmap(args.output, args.interval)
+    loop.run_until_complete(asyncio.gather(task0, task1, task2, task3))
 
 if __name__ == "__main__":
     main()
